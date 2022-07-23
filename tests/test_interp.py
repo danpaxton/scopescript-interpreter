@@ -3,7 +3,7 @@ import sys
 import math
 
 test_dir = os.path.dirname( __file__ )
-src_dir = os.path.join( test_dir, '..', 'src/interpreter')
+src_dir = os.path.join( test_dir, '..', 'src/sscript_interpreter')
 sys.path.append( src_dir )
 
 import interpreter as i
