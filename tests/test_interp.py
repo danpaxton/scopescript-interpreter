@@ -3,12 +3,12 @@ import sys
 import math
 
 test_dir = os.path.dirname( __file__ )
-src_dir = os.path.join( test_dir, '..', 'src/sscript_interpreter')
+src_dir = os.path.join( test_dir, '..', 'src')
 sys.path.append( src_dir )
 
-import interpreter as i
-import scope as s
-import atoms as a
+from scopescript_dpaxton import interpreter as i
+from scopescript_dpaxton import atoms as a
+from scopescript_dpaxton import scope as s
 #Expression tests
 
 def test_boolean():
@@ -226,21 +226,24 @@ def test_float_str():
 def test_str():
     assert i.eval_expression(None, {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'str'}, 'args': [{'kind': 'integer', 'value': '1'}]}) == a._string('1')
 
+def test_abs():
+    assert i.eval_expression(None, {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'abs'}, 'args': [{'kind': 'integer', 'value': '-1'}]}) == a._integer(1)
+
 def test_print_no_arg():
     res = i.interp_program([{'kind': 'static', 'expression': {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'print'}, 'args': []}}])
-    assert res['output'][0] == ''
+    assert res['output'] == ['\n']
 
 def test_print_single_arg():
     res = i.interp_program([{'kind': 'static', 'expression': {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'print'}, 'args': [{'kind': 'string', 'value': 'foo'}]}}])
-    assert res['output'][0] == 'foo' 
+    assert res['output'] == ['foo ', '\n'] 
 
 def test_print_multiple_arg():
     res = i.interp_program([{'kind': 'static', 'expression': {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'print'}, 'args': [{'kind': 'string', 'value': 'foo'}, {'kind': 'integer', 'value': '1'}]}}])
-    assert res['output'] == ['foo', '1']
+    assert res['output'] == ['foo ', '1 ', '\n']
 
 def test_print_collection():
     res = i.interp_program([{'kind': 'static', 'expression': {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'print'}, 'args': [{'kind': 'collection', 'value': { '1': {'kind': 'integer', 'value': '1'}}}]}}])
-    assert res['output'][0] == "{'1': 1}"
+    assert res['output'] == ["{'1': 1} ", '\n']
 
 # Statement Tests 
 

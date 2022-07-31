@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sscript_interpreter"
-version = "0.0.1"
+name = "scopescript_dpaxton"
+version = "0.0.6"
 authors = [
   { name="Dan Paxton", email="danpaxton47@gmail.com" },
 ]

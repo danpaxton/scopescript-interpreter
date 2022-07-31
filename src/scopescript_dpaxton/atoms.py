@@ -1,10 +1,10 @@
 from collections import namedtuple
-
+# Language atoms.
 _boolean=namedtuple('boolean', ['value'])
 _integer=namedtuple('integer', ['value'])
 _float=namedtuple('float', ['value'])
 _string=namedtuple('string', ['value'])
-_null=namedtuple('none', ['value'])
+_null=namedtuple('null', ['value'])
 _collection=namedtuple('collection', ['value'])
 _closure=namedtuple('closure', ['value'])
 
@@ -61,10 +61,12 @@ def not_iterable(val: tuple) -> bool:
 def not_closure(val: tuple) -> bool:
     return kind(val) != 'closure'
 
-# Maintains the original number type, int or float
-def int_or_float(x: tuple, val: int | float) -> tuple:
-    return _float(val) if kind(x) == 'float' else _integer(val)
-
+# Assignable check.
 def assignable(val: tuple) -> bool:
     res = kind(val)
     return res == 'variable' or res == 'identifier'
+
+# Maintains the original number type, int or float
+def int_or_float(x: tuple, val: int | float) -> tuple:
+    return _float(val) if kind(x) == 'float' else _integer(val)
+    

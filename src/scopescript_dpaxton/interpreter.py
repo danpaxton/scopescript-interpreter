@@ -1,6 +1,8 @@
-import atoms as a
-import scope as s
 import sys
+
+from scopescript_dpaxton import atoms as a
+from scopescript_dpaxton import scope as s
+
 # Depth of 12050 allows no more than 999 recursive calls. Significant overhead.    
 sys.setrecursionlimit(12050)
 
@@ -45,10 +47,7 @@ def _variable_(state: s.State, e: dict) -> tuple:
     name = e['name']
     result = s.find_in_scope(state, name)
     if not result:
-        if name in built_funcs:
-            return a._string(f'<built-in function {name}>')
-
-        error(f"Line {e.line}: Variable {name} is not defined.")
+        error(f"Line {e.line}: Variable '{name}' is not defined.")
 
     return result[1]
 
@@ -365,13 +364,25 @@ def _ord_(state, e) -> tuple:
         error(f"Line {e['line']}: invalid argument count for ord(...): {len(args)}.")
 
     character = eval_expression(state, args[0])
-    if not a.is_string(character):
+    if not a.is_string(character):  
         error(f"Line {e['line']}: expected a character for ord(...), received <{a.kind(character)}>.")
         
     if len(character.value) != 1:
-        error(f"Line {e['line']}: expected a character for ord(...), received a string of length {len(args)}.")
+        error(f"Line {e['line']}: expected a character for ord(...), received a string of length {len(character.value)}.")
 
     return a._integer(ord(character.value))
+
+# Built-in abs function, returns the absoulute value of the number argument.
+def _abs_(state, e) -> tuple:
+    args = e['args']
+    if len(args) != 1:
+        error(f"Line {e['line']}: invalid argument count for abs(...): {len(args)}.")
+
+    number = eval_expression(state, args[0])
+    if a.not_number(number):
+        error(f"Line {e['line']}: invalid argument type for abs(...): <{a.kind(number)}>.")
+
+    return a.int_or_float(number, abs(number.value))
 
 # Built-in len function, returns the number of elements in a collection or string length.      
 def _len_(state, e) -> tuple:
@@ -431,23 +442,16 @@ def  _float_(state, e) -> tuple:
 
     return a._float(float(num.value))
 
-# Formats collection as a string
+
 def format_collection(collection) -> str:
-    return str({ k: e.value if a.not_collection(e) else format_collection(e) for k, e in collection.value.items() })
+    return { k: e.value if a.kind(e) != 'collection' else format_collection(e) for k, e in collection.value.items() }
 
 # Returns string representation of the argument
 def str_rep(expr) -> str:
-    kind = a.kind(expr)
-    match kind:
-        case 'integer' | 'float' | 'string' | 'closure':
-            return str(expr.value)
-        case 'boolean':
-            return 'true' if expr.value else 'false'
-        case 'null':
-            return 'null'
-        case 'collection':
-            return format_collection(expr)
-        
+    if a.kind(expr) == 'collection':
+        return str(format_collection(expr))
+    
+    return str(expr.value)
 
 # Built-in str function, returns the string represention of the argument
 def _str_(state, e) -> tuple:
@@ -457,28 +461,21 @@ def _str_(state, e) -> tuple:
     
     return a._string(str_rep(eval_expression(state, args[0])))
 
-
 # Prints arguments to output array.
 def _print_(state, e) -> tuple:
     global output # []
-
-    # Append empty string if no arguments.
-    args = e['args']
-    if not args:
-        output.append('')
-    else:
     # Append string representation of each argument.
-        for arg in args:
-            output.append(str_rep(eval_expression(state, arg)))
-    
+    for arg in e['args']:
+        output.append(str_rep(eval_expression(state, arg)) + ' ')
 
+    output.append('\n')
     return a._null(None)
     
-
 # Built-in functions.
 built_funcs = {
     'type': expr( _type_ ),
     'ord': expr( _ord_ ),
+    'abs': expr( _abs_ ),
     'len': expr( _len_ ),
     'bool': expr( _bool_ ),
     'int': expr( _int_ ),
@@ -509,15 +506,15 @@ def _call_(state: s.State, e: dict) -> tuple:
         func_expr = eval_expression(state, f)
 
     if a.not_closure(func_expr):
-        error(f"Line {e['line']}: invalid type for function call: <{a.kind(func_expr)}>")
+        error(f"Line {e['line']}: invalid type for function call: <{a.kind(func_expr)}>.")
 
     func, args = func_expr.value, e['args']
     # Set name to address if anonymous function.
     if not name:
-        name = 'func_' + str(hex(id(func)))
+        name = '(anonymous) func@' + str(hex(id(func)))
     
     if len(args) != len(func.params):
-        error(f"Line {e['line']}: invalid argument count {len(args)} for {name}(...): Expected {len(func.params)}. ")
+        error(f"Line {e['line']}: invalid argument count for {name}(...): Expected {len(func.params)}.")
     # Assign parameters to arguments in the function environment.
     env = func.env.value
     for param, arg in zip(func.params, args):
@@ -624,15 +621,14 @@ def _delete_(state: s.State, e: dict, in_func: bool) -> None:
 
     collection = eval_expression(state, expr['collection'])
     if a.not_collection(collection):
-        error(f"Line {expr['line']}: invalid collection type for attribute deletion '{attribute}': <{a.kind(collection)}>")
+        error(f"Line {expr['line']}: invalid collection type for attribute deletion '{attribute}': <{a.kind(collection)}>.")
     
     if attribute in collection.value:
         del collection.value[attribute]
     else:
         error(f"Line {expr['line']}: unknown attribute reference: '{attribute}'.")
 
-    return None
-
+    return None 
 
 # Evaluates return statement
 def _return_(state: s.State, e: dict, in_func: bool) -> tuple:
@@ -657,7 +653,7 @@ statements = {
 def eval_statement(state: s.State, e: dict, in_func=False) -> tuple | None:
     kind = e['kind']
     if kind not in statements:
-        error(f"Unknown statement: <{kind}>") 
+        error(f"Unknown statement: <{kind}>.") 
 
     return statements[kind](state, e, in_func)
 
@@ -682,12 +678,14 @@ def eval_block(state, b, in_func) -> tuple | None:
     
     return None
 
+
 # Evaluates a program's AST and prdouces an output and final program state.
 def interp_program(p):
     global output
-    output, state = [], {}
+    output = []
     try:
-        eval_block(s.State(state, None), p, False)
-        return dict(kind='ok', state=state, output=output) 
+        eval_block(s.State({}, None), p, False)
+        return dict(kind='ok', output=output) 
     except:
-        return dict(kind='error', state=state, output=output)
+        return dict(kind='error', output=output)
+        
