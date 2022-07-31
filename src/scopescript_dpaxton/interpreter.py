@@ -68,7 +68,7 @@ def determine_attribute(state: s.State, e: dict) -> str | None:
         case 'attribute':
            return e['attribute']
         case 'subscriptor':
-            r = eval_expression(state, e['expression'])
+            r = eval_expression(state, e['expr'])
             if a.not_subscriptable(r):
                 error(f"Line {e['line']}: invalid key type for attribute assignment: <{a.kind(r)}>")
 
@@ -87,7 +87,7 @@ def _handle_attribute_(state: s.State, e: dict) -> tuple:
 
 # Executes subscriptor on a collection or string, or reports an error
 def _handle_subscriptor_(state: s.State, e: dict) -> tuple:
-    collection, attribute = eval_expression(state, e['collection']), eval_expression(state, e['expression'])
+    collection, attribute = eval_expression(state, e['collection']), eval_expression(state, e['expr'])
     if a.not_collection(collection):
         # String indexing
         if a.is_string(collection) and a.is_integer(attribute):
@@ -132,11 +132,11 @@ def assign_val(state: s.State, e: dict, val: tuple) -> tuple | None:
 
 # '!'
 def _logical_not_(state: s.State, e: dict) -> tuple:
-    return a._boolean(not eval_expression(state, e['expression']).value)
+    return a._boolean(not eval_expression(state, e['expr']).value)
 
 # '~'
 def _bit_not_(state: s.State, e: dict) -> tuple:
-    x = eval_expression(state, e['expression'])
+    x = eval_expression(state, e['expr'])
     if not a.is_integer(x):
         error(f"Line {e['line']}: invalid operand type for '~': <{a.kind(x)}>.")
 
@@ -144,11 +144,11 @@ def _bit_not_(state: s.State, e: dict) -> tuple:
 
 # Prefix increment or decrement
 def prefix(state: s.State, e: dict, step: int) -> tuple:
-    x, op = eval_expression(state, e['expression']), e['op']
+    x, op = eval_expression(state, e['expr']), e['op']
     if a.not_number(x):
             error(f"Line {e['line']}: invalid operand type for {op}: <{a.kind(x)}>.")
 
-    res = assign_val(state, e['expression'], a.int_or_float(x, x.value + step)) 
+    res = assign_val(state, e['expr'], a.int_or_float(x, x.value + step)) 
     if not res:
         error(f"Line {e['line']}: invalid prefix syntax for {op}: <{a.kind(x)}>.")
 
@@ -156,7 +156,7 @@ def prefix(state: s.State, e: dict, step: int) -> tuple:
 
 # Unary plus or minus
 def plus_minus(state: s.State, e: dict, fact: int) -> tuple:
-    x = eval_expression(state, e['expression'])
+    x = eval_expression(state, e['expr'])
     if a.not_number(x):
         error(f"Line {e['line']}: invalid operand type for {e['op']}: <{a.kind(x)}>.")
 
@@ -566,12 +566,12 @@ def eval_expression(state: s.State, e: dict) -> tuple:
 
 # Evaluates static statement
 def _static_(state: s.State, s: dict, in_func: bool) -> None:
-    eval_expression(state, s['expression'])
+    eval_expression(state, s['expr'])
     return None
 
 # Evaluates assignment statement
 def _assignment_(state: s.State, s: dict, in_func: bool) -> None:
-    val = eval_expression(state, s['expression'])
+    val = eval_expression(state, s['expr'])
     for e in s['assignArr']:
         assign_val(state, e, val)
 
@@ -614,7 +614,7 @@ def _for_(state: s.State, e: dict, in_func: bool) -> tuple | None:
 
 # Evaluates delete statement
 def _delete_(state: s.State, e: dict, in_func: bool) -> None:
-    expr = e['expression']
+    expr = e['expr']
     attribute = determine_attribute(state, expr) 
     if not attribute:
         error(f"Line {expr['line']}: cannot delete <{expr['kind']}>.")
@@ -632,7 +632,7 @@ def _delete_(state: s.State, e: dict, in_func: bool) -> None:
 
 # Evaluates return statement
 def _return_(state: s.State, e: dict, in_func: bool) -> tuple:
-    expr = e['expression']
+    expr = e['expr']
     if not in_func: 
         error(f"Line {expr['line']}: return outside of function.") 
 
