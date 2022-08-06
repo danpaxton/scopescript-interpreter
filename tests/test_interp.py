@@ -117,6 +117,9 @@ def test_subtract():
 def test_multiply():
     assert i.eval_expression(None, {'kind': 'binop', 'op': '*', 'e1': { 'kind': 'float','value': '2.5' } , 'e2': {'kind': 'integer', 'value': '1' } }) == a._float(2.5)
 
+def test_exponent():
+    assert i.eval_expression(None, {'kind': 'binop', 'op': '**', 'e1': { 'kind': 'float','value': '2.5' } , 'e2': {'kind': 'integer', 'value': '2' } }) == a._float(6.25)
+
 def test_divide():
     assert i.eval_expression(None, {'kind': 'binop', 'op': '/', 'e1': { 'kind': 'integer','value': '2' } , 'e2': {'kind': 'integer', 'value': '1' } }) == a._float(2.0)
 
@@ -285,7 +288,7 @@ def test_if():
     assert state.value['x'] == a._integer(0)
 
 def test_if_return():
-    assert i.eval_statement(None, {'kind': 'if', 'truePartArr': [{ 'test': {'kind': 'boolean', 'value': True}, 'part': [{'kind': 'return', 'expr': {'kind': 'integer', 'value': '1' }}]}], 'falsePart': []}, in_func=True) == a._integer(1)
+    assert i.eval_statement(None, {'kind': 'if', 'truePartArr': [{ 'test': {'kind': 'boolean', 'value': True}, 'part': [{'kind': 'return', 'expr': {'kind': 'integer', 'value': '1' }}]}], 'falsePart': []}, i.Flags(True, False)) == ('return', a._integer(1))
 
 def test_else_if():
     state = s.State({'x': a._integer(1)}, None)
@@ -301,19 +304,29 @@ def test_else():
 
 def test_else_return():
     assert i.eval_statement(None, {'kind': 'if', 'truePartArr': [{ 'test': {'kind': 'boolean', 'value': False}, 'part': []}], 
-        'falsePart': [{'kind': 'return', 'expr': {'kind': 'integer', 'value': '1'}}]}, in_func=True) == a._integer(1)
+        'falsePart': [{'kind': 'return', 'expr': {'kind': 'integer', 'value': '1'}}]}, i.Flags(True, False)) == ('return', a._integer(1))
 
 def test_while():
     state = s.State({'x': a._integer(0)}, None)
     i.eval_statement(state, {'kind': 'while', 'test': {'kind': 'binop', 'op': '<', 'e1':{'kind': 'variable', 'name':'x'}, 'e2':{'kind': 'integer', 'value': '10'}}, 'body':[{'kind': 'static', 'expr':{'kind':'unop', 'op':'++', 'expr': { 'kind': 'variable', 'name': 'x'}}}]})
     assert state.value['x'] == a._integer(10) 
 
+def test_while_continue():
+    state = s.State({'x': a._integer(0)}, None)
+    i.eval_statement(state, {'kind': 'while', 'test': {'kind': 'binop', 'op': '<', 'e1':{'kind': 'variable', 'name':'x'}, 'e2':{'kind': 'integer', 'value': '10'}}, 'body':[{'kind': 'static', 'expr':{'kind':'unop', 'op':'++', 'expr': { 'kind': 'variable', 'name': 'x'}}}, {'kind': 'continue'}, {'kind': 'static', 'expr':{'kind':'unop', 'op':'--', 'expr': { 'kind': 'variable', 'name': 'x'}}}]})
+    assert state.value['x'] == a._integer(10) 
+
+def test_while_break():
+    state = s.State({'x': a._integer(0)}, None)
+    i.eval_statement(state, {'kind': 'while', 'test': {'kind': 'boolean', 'value': True }, 'body':[{'kind': 'static', 'expr':{'kind':'unop', 'op':'++', 'expr': { 'kind': 'variable', 'name': 'x'}}}, {'kind': 'break'}]})
+    assert state.value['x'] == a._integer(1) 
+
 def test_while_return():
     state = s.State({'x': a._integer(0)}, None)
     assert i.eval_statement(state, {'kind': 'while', 'test': {'kind': 'boolean', 'value': True}, 
     'body':[{'kind': 'static', 'expr':{'kind':'unop', 'op':'++', 'expr': { 'kind': 'variable', 'name': 'x'}}}
             , {'kind': 'if', 'truePartArr': [{ 'test': {'kind': 'binop', 'op': '==', 'e1': {'kind': 'variable', 'name': 'x'}, 'e2': { 'kind': 'integer', 'value': '10'} }, 'part': [{'kind': 'return', 'expr': {'kind': 'variable', 'name': 'x' }}]}], 'falsePart': []}
-            ]}, in_func=True) == a._integer(10)
+            ]}, i.Flags(True, False)) == a._integer(10)
 
 def test_for():
     state = s.State({'x': a._integer(-5)}, None)
@@ -329,8 +342,25 @@ def test_for_return():
         'inits': [{'kind': 'assignment', 'assignArr': [{'kind': 'identifier', 'name': 'x'}], 'expr': {'kind': 'integer', 'value': '0'}}]
         , 'test': {'kind': 'boolean', 'value': True}
         , 'updates': [{'kind': 'static', 'expr':{'kind':'unop', 'op':'++', 'expr': { 'kind': 'variable', 'name': 'x' }}}]
-        , 'body':[{'kind': 'if', 'truePartArr': [{ 'test': {'kind': 'binop', 'op': '==', 'e1': {'kind': 'variable', 'name': 'x'}, 'e2': { 'kind': 'integer', 'value': '10'} }, 'part': [{'kind': 'return', 'expr': {'kind': 'variable', 'name': 'x' }}]}], 'falsePart': []}] }, in_func=True) == a._integer(10)
+        , 'body':[{'kind': 'if', 'truePartArr': [{ 'test': {'kind': 'binop', 'op': '==', 'e1': {'kind': 'variable', 'name': 'x'}, 'e2': { 'kind': 'integer', 'value': '10'} }, 'part': [{'kind': 'return', 'expr': {'kind': 'variable', 'name': 'x' }}]}], 'falsePart': []}] }, i.Flags(True, False)) == a._integer(10)
  
+def test_for_break():
+    state = s.State({'x': a._integer(-5)}, None)
+    i.eval_statement(state, {'kind': 'for', 
+        'inits': [{'kind': 'assignment', 'assignArr': [{'kind': 'identifier', 'name': 'x'}], 'expr': {'kind': 'integer', 'value': '0'}}]
+        , 'test': {'kind': 'boolean', 'value': True}
+        , 'updates': [{'kind': 'static', 'expr':{'kind':'unop', 'op':'++', 'expr': { 'kind': 'variable', 'name': 'x' }}}]
+        , 'body':[{'kind': 'static', 'expr':{'kind':'unop', 'op':'++', 'expr': { 'kind': 'variable', 'name': 'x'}}}, {'kind': 'break'}] })
+    assert state.value['x'] == a._integer(1)
+
+def test_for_continue():
+    state = s.State({'x': a._integer(-5)}, None)
+    i.eval_statement(state, {'kind': 'for', 
+        'inits': [{'kind': 'assignment', 'assignArr': [{'kind': 'identifier', 'name': 'x'}], 'expr': {'kind': 'integer', 'value': '0'}}]
+        , 'test': {'kind': 'binop', 'op': '<', 'e1': {'kind': 'variable', 'name':'x'}, 'e2':{'kind': 'integer', 'value': '10'}}
+        , 'updates': [{'kind': 'static', 'expr':{'kind':'unop', 'op':'++', 'expr': { 'kind': 'variable', 'name': 'x' }}}]
+        , 'body':[{'kind': 'continue'}, {'kind': 'static', 'expr':{'kind':'unop', 'op':'--', 'expr': { 'kind': 'variable', 'name': 'x'}}}]})
+    assert state.value['x'] == a._integer(10)
     
 def test_delete():
     state = s.State({'x': a._collection({'y': a._integer(1)})}, None)
@@ -338,4 +368,4 @@ def test_delete():
     assert 'y' not in state.value['x'].value
     
 def test_return():
-    assert i.eval_statement(None, {'kind': 'return', 'expr': {'kind': 'integer', 'value': '1'}}, True) == a._integer(1)
+    assert i.eval_statement(None, {'kind': 'return', 'expr': {'kind': 'integer', 'value': '1'}}, i.Flags(True, False)) == ('return', a._integer(1))

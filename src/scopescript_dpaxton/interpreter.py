@@ -1,10 +1,13 @@
-import sys
+import sys, collections
 
 from scopescript_dpaxton import atoms as a
 from scopescript_dpaxton import scope as s
 
 # Depth of 12050 allows no more than 999 recursive calls. Significant overhead.    
 sys.setrecursionlimit(12050)
+
+# Flags that indicate if a function is being called and if a loop is entered.
+Flags = collections.namedtuple('flags', ['in_func', 'in_loop'])
 
 # Terminates program and sets 'output' to the message arg.
 def error(msg: str):
@@ -18,7 +21,7 @@ def expr(f):
 
 # Statement factory
 def stmt(f):
-    return lambda state, s, in_func: f(state, s, in_func)
+    return lambda state, s, flags: f(state, s, flags)
 
 # Atom expression functions
 
@@ -254,6 +257,11 @@ def _multiply_(state: s.State, e: dict) -> tuple:
     f, v1, v2 = binop_numeric(state, e)
     return f(v1 * v2)
 
+#'**'
+def _exponent_(state: s.State, e: dict) -> tuple:
+    f, v1, v2 = binop_numeric(state, e)
+    return f(v1 ** v2)
+
 # '/' 
 def _divide_(state: s.State, e: dict) -> tuple:
     f, v1, v2 = binop_numeric(state, e, float=True)
@@ -326,6 +334,7 @@ binops = {
     '+': expr( _add_concat_ ),
     '-': expr( _subtract_ ),
     '*': expr( _multiply_ ),
+    '**': expr( _exponent_ ), 
     '/': expr( _divide_ ),
     '%': expr( _remainder_ ),
     '<<': expr( _left_shift_ ),
@@ -521,14 +530,14 @@ def _call_(state: s.State, e: dict) -> tuple:
         env[param] = eval_expression(state, arg)
     # Evaluate function block in it's own environment.
     try:
-        result = interp_func(func.env, func.body) 
+        result = eval_block(func.env, func.body, Flags(True, False)) 
     except RecursionError:
         error(f"Line {e['line']}: maximum recursion depth exceeded for {name}(...).")
     # Return null if there is no return value
     if not result:
         return a._null(None)
 
-    return result
+    return result[1]
 
 
 # Ternary handle
@@ -565,12 +574,12 @@ def eval_expression(state: s.State, e: dict) -> tuple:
 # Statement functions
 
 # Evaluates static statement
-def _static_(state: s.State, s: dict, in_func: bool) -> None:
+def _static_(state: s.State, s: dict, flags: tuple) -> None:
     eval_expression(state, s['expr'])
     return None
 
 # Evaluates assignment statement
-def _assignment_(state: s.State, s: dict, in_func: bool) -> None:
+def _assignment_(state: s.State, s: dict, flags: tuple) -> None:
     val = eval_expression(state, s['expr'])
     for e in s['assignArr']:
         assign_val(state, e, val)
@@ -578,42 +587,53 @@ def _assignment_(state: s.State, s: dict, in_func: bool) -> None:
     return None
 
 # Evaluates if statement
-def _if_(state: s.State, e: dict, in_func: bool) -> tuple | None:
+def _if_(state: s.State, e: dict, flags: tuple) -> tuple | None:
     new_state = s.State({}, state)
     for i in e['truePartArr']:
         if eval_expression(state, i['test']).value:
-            return eval_block(new_state, i['part'], in_func)
+            return eval_block(new_state, i['part'], flags)
     
-    return eval_block(new_state, e['falsePart'], in_func)
+    return eval_block(new_state, e['falsePart'], flags)
 
 # Evaluates while statement
-def _while_(state: s.State, e: dict, in_func: bool) -> tuple | None:
+def _while_(state: s.State, e: dict, flags: tuple) -> tuple | None:
     new_state = s.State({}, state)
-    ret_val = None
+    new_flags = Flags(flags.in_func, True)
+
+    res = None
     while eval_expression(state, e['test']).value:
-        if (ret_val := eval_block(new_state, e['body'], in_func)):
-            return ret_val
+        if (res := eval_block(new_state, e['body'], new_flags)):
+            match res[0]:
+                case 'return' | 'break':
+                    return res[1]
+                # case 'continue' 
 
     return None
 
 # Evaluates for statement
-def _for_(state: s.State, e: dict, in_func: bool) -> tuple | None:
+def _for_(state: s.State, e: dict, flags: tuple) -> tuple | None:
     new_state = s.State({}, state)
     for stmt in e['inits']:
-        _assignment_(new_state, stmt, False)
+        # Flags not required for initializer statements.
+        eval_statement(new_state, stmt)
 
-    ret_val = None
+    new_flags = Flags(flags.in_func, True)
+    res = None
     while eval_expression(new_state, e['test']).value:
-        if (ret_val := eval_block(new_state, e['body'], in_func)):
-            return ret_val
+        if (res := eval_block(new_state, e['body'], new_flags)):
+            match res[0]:
+                case 'return' | 'break':
+                    return res[1]
+                # case 'continue'
 
         for stmt in e['updates']:
+            # Flags not required for update statements.
             eval_statement(new_state, stmt)
         
     return None
 
 # Evaluates delete statement
-def _delete_(state: s.State, e: dict, in_func: bool) -> None:
+def _delete_(state: s.State, e: dict, flags: tuple) -> None:
     expr = e['expr']
     attribute = determine_attribute(state, expr) 
     if not attribute:
@@ -631,12 +651,24 @@ def _delete_(state: s.State, e: dict, in_func: bool) -> None:
     return None 
 
 # Evaluates return statement
-def _return_(state: s.State, e: dict, in_func: bool) -> tuple:
+def _return_(state: s.State, e: dict, flags: tuple) -> tuple:
     expr = e['expr']
-    if not in_func: 
+    if not flags.in_func:
         error(f"Line {expr['line']}: return outside of function.") 
 
-    return eval_expression(state, expr)
+    return 'return', eval_expression(state, expr)
+
+def _break_(state: s.State, e: dict, flags: tuple) -> tuple:
+    if not flags.in_loop:
+        error(f"Line {e['line']}: break outside of loop.") 
+
+    return 'break', None
+
+def _continue_(state: s.State, e: dict, flags: tuple) -> tuple:
+    if not flags.in_loop:
+        error(f"Line {e['line']}: continue outside of loop.") 
+
+    return 'continue', None
 
 # Statements
 statements = {
@@ -646,37 +678,28 @@ statements = {
     'while': stmt( _while_ ),
     'for': stmt( _for_ ),
     'delete': stmt( _delete_ ),
-    'return': stmt( _return_ )
+    'return': stmt( _return_ ),
+    'break': stmt( _break_ ),
+    'continue':  stmt( _continue_ )
 }
 
 # Executes a given ast statement
-def eval_statement(state: s.State, e: dict, in_func=False) -> tuple | None:
+def eval_statement(state: s.State, e: dict, flags: tuple = Flags(False, False)) -> tuple | None:
     kind = e['kind']
     if kind not in statements:
         error(f"Unknown statement: <{kind}>.") 
 
-    return statements[kind](state, e, in_func)
+    return statements[kind](state, e, flags)
 
-# Finds a return value from a block of code, or returns None otherwise
-def interp_func(state: s.State, b: list) -> tuple | None:
+
+# Evaluates a block of code, searches for return value.
+def eval_block(state: s.State, b: list, flags: tuple) -> tuple | None:
     ret_val = None
     for stmt in b:
-        if (ret_val := eval_statement(state, stmt, in_func=True)):
+        if (ret_val := eval_statement(state, stmt, flags)):
             break
     
     return ret_val
-
-# Evaluates a block of code
-def eval_block(state, b, in_func) -> tuple | None:
-    # Search for return value if in function call
-    if in_func:
-        return interp_func(state, b)
-    
-    # Evaluate each statement and return None otherwise
-    for stmt in b:
-        eval_statement(state, stmt)
-    
-    return None
 
 
 # Evaluates a program's AST and prdouces an output and final program state.
@@ -684,8 +707,8 @@ def interp_program(p):
     global output
     output = []
     try:
-        eval_block(s.State({}, None), p, False)
+        eval_block(s.State({}, None), p, Flags(False, False))
         return dict(kind='ok', output=output) 
     except:
         return dict(kind='error', output=output)
-        
+ 
