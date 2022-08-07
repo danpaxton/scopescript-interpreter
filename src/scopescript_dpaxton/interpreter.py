@@ -6,13 +6,13 @@ from scopescript_dpaxton import scope as s
 # Depth of 12050 allows no more than 999 recursive calls. Significant overhead.    
 sys.setrecursionlimit(12050)
 
-# Flags that indicate if a function is being called and if a loop is entered.
+# Flags that indicate if a function is called and if a loop is entered.
 Flags = collections.namedtuple('flags', ['in_func', 'in_loop'])
 
 # Terminates program and sets 'output' to the message arg.
-def error(msg: str):
-    global output
-    output = [msg]
+def error(state: tuple, msg: str):
+    state.output.clear()
+    state.output.append(msg)
     assert False
 
 # Expression factory
@@ -50,7 +50,7 @@ def _variable_(state: s.State, e: dict) -> tuple:
     name = e['name']
     result = s.find_in_scope(state, name)
     if not result:
-        error(f"Line {e.line}: Variable '{name}' is not defined.")
+        error(state, f"Line {e.line}: Variable '{name}' is not defined.")
 
     return result[1]
 
@@ -73,7 +73,7 @@ def determine_attribute(state: s.State, e: dict) -> str | None:
         case 'subscriptor':
             r = eval_expression(state, e['expr'])
             if a.not_subscriptable(r):
-                error(f"Line {e['line']}: invalid key type for attribute assignment: <{a.kind(r)}>")
+                error(state, f"Line {e['line']}: invalid key type for attribute assignment: <{a.kind(r)}>")
 
             return str(r.value)
     
@@ -83,7 +83,7 @@ def determine_attribute(state: s.State, e: dict) -> str | None:
 def _handle_attribute_(state: s.State, e: dict) -> tuple:
     collection = eval_expression(state, e['collection']) 
     if a.not_collection(collection):
-        error(f"Line {e['line']}: invalid collection type for attribute '{e['attribute']}': <{a.kind(collection)}>")
+        error(state, f"Line {e['line']}: invalid collection type for attribute '{e['attribute']}': <{a.kind(collection)}>")
     
     return collection.value.get(e['attribute'], a._null(None))
 
@@ -97,14 +97,14 @@ def _handle_subscriptor_(state: s.State, e: dict) -> tuple:
             str_len, index = len(collection.value), attribute.value
             # Error if index is not in range of string length.
             if not -str_len <= index < str_len:
-                error(f"Line {e['line']}: invalid string index for '{collection.value}': {index}.")
+                error(state, f"Line {e['line']}: invalid string index for '{collection.value}': {index}.")
             # Return character as a string.
             return a._string(collection.value[index])
 
-        error(f"Line {e['line']}: invalid collection type for attribute '{attribute.value}': <{a.kind(collection)}>.")
+        error(state, f"Line {e['line']}: invalid collection type for attribute '{attribute.value}': <{a.kind(collection)}>.")
     
     if a.not_subscriptable(attribute):
-        error(f"Line {e['line']}: invalid key type for attribute '{attribute.value}': <{a.kind(attribute)}>.")
+        error(state, f"Line {e['line']}: invalid key type for attribute '{attribute.value}': <{a.kind(attribute)}>.")
  
     return collection.value.get(str(attribute.value), a._null(None))
 
@@ -125,7 +125,7 @@ def assign_val(state: s.State, e: dict, val: tuple) -> tuple | None:
 
     collection = eval_expression(state, e['collection']) 
     if a.not_collection(collection):
-        error(f"Line {e['line']}: invalid collection type for attribute '{attribute}': <{a.kind(collection)}>")
+        error(state, f"Line {e['line']}: invalid collection type for attribute '{attribute}': <{a.kind(collection)}>")
 
     collection.value[attribute] = val
     return val
@@ -141,7 +141,7 @@ def _logical_not_(state: s.State, e: dict) -> tuple:
 def _bit_not_(state: s.State, e: dict) -> tuple:
     x = eval_expression(state, e['expr'])
     if not a.is_integer(x):
-        error(f"Line {e['line']}: invalid operand type for '~': <{a.kind(x)}>.")
+        error(state, f"Line {e['line']}: invalid operand type for '~': <{a.kind(x)}>.")
 
     return a._integer(~x.value)
 
@@ -149,11 +149,11 @@ def _bit_not_(state: s.State, e: dict) -> tuple:
 def prefix(state: s.State, e: dict, step: int) -> tuple:
     x, op = eval_expression(state, e['expr']), e['op']
     if a.not_number(x):
-            error(f"Line {e['line']}: invalid operand type for {op}: <{a.kind(x)}>.")
+            error(state, f"Line {e['line']}: invalid operand type for {op}: <{a.kind(x)}>.")
 
     res = assign_val(state, e['expr'], a.int_or_float(x, x.value + step)) 
     if not res:
-        error(f"Line {e['line']}: invalid prefix syntax for {op}: <{a.kind(x)}>.")
+        error(state, f"Line {e['line']}: invalid prefix syntax for {op}: <{a.kind(x)}>.")
 
     return res
 
@@ -161,7 +161,7 @@ def prefix(state: s.State, e: dict, step: int) -> tuple:
 def plus_minus(state: s.State, e: dict, fact: int) -> tuple:
     x = eval_expression(state, e['expr'])
     if a.not_number(x):
-        error(f"Line {e['line']}: invalid operand type for {e['op']}: <{a.kind(x)}>.")
+        error(state, f"Line {e['line']}: invalid operand type for {e['op']}: <{a.kind(x)}>.")
 
     return a.int_or_float(x, x.value * fact) 
 
@@ -195,7 +195,7 @@ unops = {
 def _determine_unop_(state: s.State, e: dict) -> tuple:
     op = e['op']
     if op not in unops:
-        error(f"Line {e['line']}: unknown operator {op}.")
+        error(state, f"Line {e['line']}: unknown operator {op}.")
     
     return unops[op](state, e)
 
@@ -209,7 +209,7 @@ def binop_numeric(state: s.State, e: dict, str=False, float=False):
         return (lambda val: a._string(val) ), e1.value, e2.value
 
     if a.not_numbers(e1, e2):
-        error(f"Line {e['line']}: operator '{e['op']}' not supported between types <{a.kind(e1)}> and <{a.kind(e2)}>.")
+        error(state, f"Line {e['line']}: operator '{e['op']}' not supported between types <{a.kind(e1)}> and <{a.kind(e2)}>.")
 
     if float or a.any_floats(e1, e2):
         return (lambda val: a._float(val) ), e1.value, e2.value
@@ -220,7 +220,7 @@ def binop_numeric(state: s.State, e: dict, str=False, float=False):
 def binop_bit(state: s.State, e: dict) -> tuple:
     e1, e2 = eval_expression(state, e['e1']), eval_expression(state, e['e2'])
     if a.not_integers(e1, e2):
-        error(f"Line {e['line']}: operator '{e['op']}' not supported between types <{a.kind(e1)}> and <{a.kind(e2)}>.")
+        error(state, f"Line {e['line']}: operator '{e['op']}' not supported between types <{a.kind(e1)}> and <{a.kind(e2)}>.")
     
     return e1.value, e2.value
 
@@ -228,7 +228,7 @@ def binop_bit(state: s.State, e: dict) -> tuple:
 def binop_cmp(state: s.State, e: dict) -> tuple:
     e1, e2 = eval_expression(state, e['e1']), eval_expression(state, e['e2'])
     if a.not_numbers(e1, e2) and not a.are_strings(e1, e2):
-        error(f"Line {e['line']}: operator '{e['op']}' not supported between types <{a.kind(e1)}> and <{a.kind(e2)}>.")
+        error(state, f"Line {e['line']}: operator '{e['op']}' not supported between types <{a.kind(e1)}> and <{a.kind(e2)}>.")
     
     return e1.value, e2.value
 
@@ -354,7 +354,7 @@ binops = {
 def _determine_binop_(state: s.State, e: dict) -> tuple:  
     op = e['op']
     if op not in binops:
-        error(f"Line {e['line']}: unknown operator {op}.")
+        error(state, f"Line {e['line']}: unknown operator {op}.")
 
     return binops[op](state, e)
 
@@ -362,7 +362,7 @@ def _determine_binop_(state: s.State, e: dict) -> tuple:
 def _type_(state, e) -> tuple:
     args = e['args']
     if len(args) != 1:
-        error(f"Line {e['line']}: invalid argument count for type(...): {len(args)}.")
+        error(state, f"Line {e['line']}: invalid argument count for type(...): {len(args)}.")
 
     return a._string(a.kind(eval_expression(state, args[0])))
 
@@ -370,14 +370,14 @@ def _type_(state, e) -> tuple:
 def _ord_(state, e) -> tuple:
     args = e['args']
     if len(args) != 1:
-        error(f"Line {e['line']}: invalid argument count for ord(...): {len(args)}.")
+        error(state, f"Line {e['line']}: invalid argument count for ord(...): {len(args)}.")
 
     character = eval_expression(state, args[0])
     if not a.is_string(character):  
-        error(f"Line {e['line']}: expected a character for ord(...), received <{a.kind(character)}>.")
+        error(state, f"Line {e['line']}: expected a character for ord(...), received <{a.kind(character)}>.")
         
     if len(character.value) != 1:
-        error(f"Line {e['line']}: expected a character for ord(...), received a string of length {len(character.value)}.")
+        error(state, f"Line {e['line']}: expected a character for ord(...), received a string of length {len(character.value)}.")
 
     return a._integer(ord(character.value))
 
@@ -385,11 +385,11 @@ def _ord_(state, e) -> tuple:
 def _abs_(state, e) -> tuple:
     args = e['args']
     if len(args) != 1:
-        error(f"Line {e['line']}: invalid argument count for abs(...): {len(args)}.")
+        error(state, f"Line {e['line']}: invalid argument count for abs(...): {len(args)}.")
 
     number = eval_expression(state, args[0])
     if a.not_number(number):
-        error(f"Line {e['line']}: invalid argument type for abs(...): <{a.kind(number)}>.")
+        error(state, f"Line {e['line']}: invalid argument type for abs(...): <{a.kind(number)}>.")
 
     return a.int_or_float(number, abs(number.value))
 
@@ -397,11 +397,11 @@ def _abs_(state, e) -> tuple:
 def _len_(state, e) -> tuple:
     args = e['args']
     if len(args) != 1:
-        error(f"Line {e['line']}: invalid argument count for len(...): {len(args)}.")
+        error(state, f"Line {e['line']}: invalid argument count for len(...): {len(args)}.")
 
     iterable = eval_expression(state, args[0])
     if a.not_iterable(iterable):
-        error(f"Line {e['line']}: expected a string or collection for len(...), received <{a.kind(iterable)}>.")
+        error(state, f"Line {e['line']}: expected a string or collection for len(...), received <{a.kind(iterable)}>.")
 
     return a._integer(len(iterable.value))
 
@@ -409,7 +409,7 @@ def _len_(state, e) -> tuple:
 def _bool_(state, e) -> tuple:
     args = e['args']
     if len(args) != 1:
-        error(f"Line {e['line']}: invalid argument count for bool(...): {len(args)}.")
+        error(state, f"Line {e['line']}: invalid argument count for bool(...): {len(args)}.")
     
     return a._boolean(bool(eval_expression(state, args[0]).value))
 
@@ -417,7 +417,7 @@ def _bool_(state, e) -> tuple:
 def  _int_(state, e) -> tuple:
     args = e['args']
     if len(args) != 1:
-        error(f"Line {e['line']}: invalid argument count for int(...): {len(args)}.")
+        error(state, f"Line {e['line']}: invalid argument count for int(...): {len(args)}.")
 
     num = eval_expression(state, args[0])
     # String literal
@@ -425,10 +425,10 @@ def  _int_(state, e) -> tuple:
         try:
             return a._integer(int(num.value))
         except:
-            error(f"Line {e['line']}: invalid literal for int(...) with base 10: '{num.value}'.")
+            error(state, f"Line {e['line']}: invalid literal for int(...) with base 10: '{num.value}'.")
 
     if a.not_number(num):
-        error(f"Line {e['line']}: invalid argument type for int(...): <{a.kind(num)}>.")
+        error(state, f"Line {e['line']}: invalid argument type for int(...): <{a.kind(num)}>.")
 
     return a._integer(int(num.value))
     
@@ -436,7 +436,7 @@ def  _int_(state, e) -> tuple:
 def  _float_(state, e) -> tuple:
     args = e['args']
     if len(args) != 1:
-        error(f"Line {e['line']}: invalid argument count for float(...): {len(args)}.")
+        error(state, f"Line {e['line']}: invalid argument count for float(...): {len(args)}.")
 
     num = eval_expression(state, args[0])
     # String literal
@@ -444,10 +444,10 @@ def  _float_(state, e) -> tuple:
         try:
             return a._float(float(num.value))
         except:
-            error(f"Line {e['line']}: could not convert string for float(...): '{num.value}'.")
+            error(state, f"Line {e['line']}: could not convert string for float(...): '{num.value}'.")
 
     if a.not_number(num):
-        error(f"Line {e['line']}: invalid argument type for float(...): <{a.kind(num)}>.")
+        error(state, f"Line {e['line']}: invalid argument type for float(...): <{a.kind(num)}>.")
 
     return a._float(float(num.value))
 
@@ -466,18 +466,18 @@ def str_rep(expr) -> str:
 def _str_(state, e) -> tuple:
     args = e['args']
     if len(args) != 1:
-        error(f"Line {e['line']}: invalid argument count for str(...): {len(args)}.")
+        error(state, f"Line {e['line']}: invalid argument count for str(...): {len(args)}.")
     
     return a._string(str_rep(eval_expression(state, args[0])))
 
 # Prints arguments to output array.
 def _print_(state, e) -> tuple:
-    global output # []
+    out = state.output
     # Append string representation of each argument.
     for arg in e['args']:
-        output.append(str_rep(eval_expression(state, arg)) + ' ')
+        out.append(str_rep(eval_expression(state, arg)) + ' ')
 
-    output.append('\n')
+    out.append('\n')
     return a._null(None)
     
 # Built-in functions.
@@ -509,13 +509,13 @@ def _call_(state: s.State, e: dict) -> tuple:
             # Return built-in function result.
             return built_funcs[name](state, e)
         else:
-            error(f"Line {e['line']}: function {name}(...) is not defined.")
+            error(state, f"Line {e['line']}: function {name}(...) is not defined.")
     # Anonymous function.
     else:
         func_expr = eval_expression(state, f)
 
     if a.not_closure(func_expr):
-        error(f"Line {e['line']}: invalid type for function call: <{a.kind(func_expr)}>.")
+        error(state, f"Line {e['line']}: invalid type for function call: <{a.kind(func_expr)}>.")
 
     func, args = func_expr.value, e['args']
     # Set name to address if anonymous function.
@@ -523,7 +523,7 @@ def _call_(state: s.State, e: dict) -> tuple:
         name = '(anonymous) func@' + str(hex(id(func)))
     
     if len(args) != len(func.params):
-        error(f"Line {e['line']}: invalid argument count for {name}(...): Expected {len(func.params)}.")
+        error(state, f"Line {e['line']}: invalid argument count for {name}(...): Expected {len(func.params)}.")
     # Assign parameters to arguments in the function environment.
     env = func.env.value
     for param, arg in zip(func.params, args):
@@ -532,7 +532,7 @@ def _call_(state: s.State, e: dict) -> tuple:
     try:
         result = eval_block(func.env, func.body, Flags(True, False)) 
     except RecursionError:
-        error(f"Line {e['line']}: maximum recursion depth exceeded for {name}(...).")
+        error(state, f"Line {e['line']}: maximum recursion depth exceeded for {name}(...).")
     # Return null if there is no return value
     if not result:
         return a._null(None)
@@ -566,7 +566,7 @@ expressions = {
 def eval_expression(state: s.State, e: dict) -> tuple:
     kind = e['kind']
     if kind not in expressions:
-        error(f"Line {e['line']}: unknown expression: <{kind}>.") 
+        error(state, f"Line {e['line']}: unknown expression: <{kind}>.") 
     
     return expressions[kind](state, e)
 
@@ -588,7 +588,7 @@ def _assignment_(state: s.State, s: dict, flags: tuple) -> None:
 
 # Evaluates if statement
 def _if_(state: s.State, e: dict, flags: tuple) -> tuple | None:
-    new_state = s.State({}, state)
+    new_state = s.State({}, state, state.output)
     for i in e['truePartArr']:
         if eval_expression(state, i['test']).value:
             return eval_block(new_state, i['part'], flags)
@@ -597,7 +597,7 @@ def _if_(state: s.State, e: dict, flags: tuple) -> tuple | None:
 
 # Evaluates while statement
 def _while_(state: s.State, e: dict, flags: tuple) -> tuple | None:
-    new_state = s.State({}, state)
+    new_state = s.State({}, state, state.output)
     new_flags = Flags(flags.in_func, True)
 
     res = None
@@ -605,14 +605,14 @@ def _while_(state: s.State, e: dict, flags: tuple) -> tuple | None:
         if (res := eval_block(new_state, e['body'], new_flags)):
             match res[0]:
                 case 'return' | 'break':
-                    return res[1]
+                    return res
                 # case 'continue' 
 
     return None
 
 # Evaluates for statement
 def _for_(state: s.State, e: dict, flags: tuple) -> tuple | None:
-    new_state = s.State({}, state)
+    new_state = s.State({}, state, state.output)
     for stmt in e['inits']:
         # Flags not required for initializer statements.
         eval_statement(new_state, stmt)
@@ -623,7 +623,7 @@ def _for_(state: s.State, e: dict, flags: tuple) -> tuple | None:
         if (res := eval_block(new_state, e['body'], new_flags)):
             match res[0]:
                 case 'return' | 'break':
-                    return res[1]
+                    return res
                 # case 'continue'
 
         for stmt in e['updates']:
@@ -637,16 +637,16 @@ def _delete_(state: s.State, e: dict, flags: tuple) -> None:
     expr = e['expr']
     attribute = determine_attribute(state, expr) 
     if not attribute:
-        error(f"Line {expr['line']}: cannot delete <{expr['kind']}>.")
+        error(state, f"Line {expr['line']}: cannot delete <{expr['kind']}>.")
 
     collection = eval_expression(state, expr['collection'])
     if a.not_collection(collection):
-        error(f"Line {expr['line']}: invalid collection type for attribute deletion '{attribute}': <{a.kind(collection)}>.")
+        error(state, f"Line {expr['line']}: invalid collection type for attribute deletion '{attribute}': <{a.kind(collection)}>.")
     
     if attribute in collection.value:
         del collection.value[attribute]
     else:
-        error(f"Line {expr['line']}: unknown attribute reference: '{attribute}'.")
+        error(state, f"Line {expr['line']}: unknown attribute reference: '{attribute}'.")
 
     return None 
 
@@ -654,19 +654,19 @@ def _delete_(state: s.State, e: dict, flags: tuple) -> None:
 def _return_(state: s.State, e: dict, flags: tuple) -> tuple:
     expr = e['expr']
     if not flags.in_func:
-        error(f"Line {expr['line']}: return outside of function.") 
+        error(state, f"Line {expr['line']}: return outside of function.") 
 
     return 'return', eval_expression(state, expr)
 
 def _break_(state: s.State, e: dict, flags: tuple) -> tuple:
     if not flags.in_loop:
-        error(f"Line {e['line']}: break outside of loop.") 
+        error(state, f"Line {e['line']}: break outside of loop.") 
 
     return 'break', None
 
 def _continue_(state: s.State, e: dict, flags: tuple) -> tuple:
     if not flags.in_loop:
-        error(f"Line {e['line']}: continue outside of loop.") 
+        error(state, f"Line {e['line']}: continue outside of loop.") 
 
     return 'continue', None
 
@@ -687,7 +687,7 @@ statements = {
 def eval_statement(state: s.State, e: dict, flags: tuple = Flags(False, False)) -> tuple | None:
     kind = e['kind']
     if kind not in statements:
-        error(f"Unknown statement: <{kind}>.") 
+        error(state, f"Unknown statement: <{kind}>.") 
 
     return statements[kind](state, e, flags)
 
@@ -704,11 +704,11 @@ def eval_block(state: s.State, b: list, flags: tuple) -> tuple | None:
 
 # Evaluates a program's AST and prdouces an output and final program state.
 def interp_program(p):
-    global output
-    output = []
+    out = []
     try:
-        eval_block(s.State({}, None), p, Flags(False, False))
-        return dict(kind='ok', output=output) 
+        eval_block(s.State({}, None, out), p, Flags(False, False))
+        return dict(kind='ok', output=out)
+    except AssertionError:
+        return dict(kind='error', output=out)
     except:
-        return dict(kind='error', output=output)
- 
+        return dict(kind='error', output=[])
