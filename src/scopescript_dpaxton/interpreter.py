@@ -73,7 +73,7 @@ def determine_attribute(state: s.State, e: dict) -> str | None:
         case 'subscriptor':
             r = eval_expression(state, e['expr'])
             if a.not_subscriptable(r):
-                error(state, f"Line {e['line']}: invalid key type for attribute assignment: <{a.kind(r)}>")
+                error(state, f"Line {e['line']}: invalid key type for attribute assignment: <{a.kind(r)}>.")
 
             return str(r.value)
     
@@ -83,7 +83,7 @@ def determine_attribute(state: s.State, e: dict) -> str | None:
 def _handle_attribute_(state: s.State, e: dict) -> tuple:
     collection = eval_expression(state, e['collection']) 
     if a.not_collection(collection):
-        error(state, f"Line {e['line']}: invalid collection type for attribute '{e['attribute']}': <{a.kind(collection)}>")
+        error(state, f"Line {e['line']}: invalid collection type for attribute '{e['attribute']}': <{a.kind(collection)}>.")
     
     return collection.value.get(e['attribute'], a._null(None))
 
@@ -125,7 +125,7 @@ def assign_val(state: s.State, e: dict, val: tuple) -> tuple | None:
 
     collection = eval_expression(state, e['collection']) 
     if a.not_collection(collection):
-        error(state, f"Line {e['line']}: invalid collection type for attribute '{attribute}': <{a.kind(collection)}>")
+        error(state, f"Line {e['line']}: invalid collection type for attribute '{attribute}': <{a.kind(collection)}>.")
 
     collection.value[attribute] = val
     return val
@@ -475,7 +475,8 @@ def _print_(state, e) -> tuple:
     out = state.output
     # Append string representation of each argument.
     for arg in e['args']:
-        out.append(str_rep(eval_expression(state, arg)) + ' ')
+        out.append(str_rep(eval_expression(state, arg)))
+        out.append(' ')
 
     out.append('\n')
     return a._null(None)
@@ -637,11 +638,11 @@ def _delete_(state: s.State, e: dict, flags: tuple) -> None:
     expr = e['expr']
     attribute = determine_attribute(state, expr) 
     if not attribute:
-        error(state, f"Line {expr['line']}: cannot delete <{expr['kind']}>.")
+        error(state, f"Line {e['line']}: cannot delete <{expr['kind']}>.")
 
     collection = eval_expression(state, expr['collection'])
     if a.not_collection(collection):
-        error(state, f"Line {expr['line']}: invalid collection type for attribute deletion '{attribute}': <{a.kind(collection)}>.")
+        error(state, f"Line {e['line']}: invalid collection type for attribute deletion '{attribute}': <{a.kind(collection)}>.")
     
     if attribute in collection.value:
         del collection.value[attribute]
@@ -652,11 +653,10 @@ def _delete_(state: s.State, e: dict, flags: tuple) -> None:
 
 # Evaluates return statement
 def _return_(state: s.State, e: dict, flags: tuple) -> tuple:
-    expr = e['expr']
     if not flags.in_func:
-        error(state, f"Line {expr['line']}: return outside of function.") 
+        error(state, f"Line {e['line']}: return outside of function.") 
 
-    return 'return', eval_expression(state, expr)
+    return 'return', eval_expression(state,  e['expr'])
 
 def _break_(state: s.State, e: dict, flags: tuple) -> tuple:
     if not flags.in_loop:
@@ -693,7 +693,7 @@ def eval_statement(state: s.State, e: dict, flags: tuple = Flags(False, False)) 
 
 
 # Evaluates a block of code, searches for return value.
-def eval_block(state: s.State, b: list, flags: tuple) -> tuple | None:
+def eval_block(state: s.State, b: list, flags: tuple = Flags(False, False)) -> tuple | None:
     ret_val = None
     for stmt in b:
         if (ret_val := eval_statement(state, stmt, flags)):
@@ -706,7 +706,7 @@ def eval_block(state: s.State, b: list, flags: tuple) -> tuple | None:
 def interp_program(p):
     out = []
     try:
-        eval_block(s.State({}, None, out), p, Flags(False, False))
+        eval_block(s.State({}, None, out), p)
         return dict(kind='ok', output=out)
     except AssertionError:
         return dict(kind='error', output=out)

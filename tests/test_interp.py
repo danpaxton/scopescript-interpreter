@@ -238,15 +238,15 @@ def test_print_no_arg():
 
 def test_print_single_arg():
     res = i.interp_program([{'kind': 'static', 'expr': {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'print'}, 'args': [{'kind': 'string', 'value': 'foo'}]}}])
-    assert res['output'] == ['foo ', '\n'] 
+    assert res['output'] == ['foo', ' ', '\n'] 
 
 def test_print_multiple_arg():
     res = i.interp_program([{'kind': 'static', 'expr': {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'print'}, 'args': [{'kind': 'string', 'value': 'foo'}, {'kind': 'integer', 'value': '1'}]}}])
-    assert res['output'] == ['foo ', '1 ', '\n']
+    assert res['output'] == ['foo', ' ', '1', ' ', '\n']
 
 def test_print_collection():
     res = i.interp_program([{'kind': 'static', 'expr': {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'print'}, 'args': [{'kind': 'collection', 'value': { '1': {'kind': 'integer', 'value': '1'}}}]}}])
-    assert res['output'] == ["{'1': 1} ", '\n']
+    assert res['output'] == ["{'1': 1}", ' ', '\n']
 
 # Statement Tests 
 
