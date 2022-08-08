@@ -257,11 +257,6 @@ def _multiply_(state: s.State, e: dict) -> tuple:
     f, v1, v2 = binop_numeric(state, e)
     return f(v1 * v2)
 
-#'**'
-def _exponent_(state: s.State, e: dict) -> tuple:
-    f, v1, v2 = binop_numeric(state, e)
-    return f(v1 ** v2)
-
 # '/' 
 def _divide_(state: s.State, e: dict) -> tuple:
     f, v1, v2 = binop_numeric(state, e, float=True)
@@ -334,7 +329,6 @@ binops = {
     '+': expr( _add_concat_ ),
     '-': expr( _subtract_ ),
     '*': expr( _multiply_ ),
-    '**': expr( _exponent_ ), 
     '/': expr( _divide_ ),
     '%': expr( _remainder_ ),
     '<<': expr( _left_shift_ ),
@@ -404,6 +398,21 @@ def _len_(state, e) -> tuple:
         error(state, f"Line {e['line']}: expected a string or collection for len(...), received <{a.kind(iterable)}>.")
 
     return a._integer(len(iterable.value))
+
+# Built-in pow function, returns arg[0] to the power of arg[1].
+def _pow_(state, e) -> tuple:
+    args = e['args']
+    if len(args) != 2:
+        error(state, f"Line {e['line']}: invalid argument count for pow(...): {len(args)}.")
+
+    b, p = eval_expression(state, args[0]), eval_expression(state, args[1])
+    if a.not_numbers(b, p):
+        error(state, f"Line {e['line']}: invalid argument types for pow(...), received <{a.kind(b)}> and <{a.kind(p)}>.")
+    
+    if a.any_floats(b, p):
+        return a._float(pow(b.value, p.value))
+
+    return a._integer(pow(b.value, p.value))
 
 # Built-in bool function, returns the boolean value of the argument.
 def _bool_(state, e) -> tuple:
@@ -486,6 +495,7 @@ built_funcs = {
     'type': expr( _type_ ),
     'ord': expr( _ord_ ),
     'abs': expr( _abs_ ),
+    'pow': expr( _pow_ ),
     'len': expr( _len_ ),
     'bool': expr( _bool_ ),
     'int': expr( _int_ ),

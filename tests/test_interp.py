@@ -117,9 +117,6 @@ def test_subtract():
 def test_multiply():
     assert i.eval_expression(None, {'kind': 'binop', 'op': '*', 'e1': { 'kind': 'float','value': '2.5' } , 'e2': {'kind': 'integer', 'value': '1' } }) == a._float(2.5)
 
-def test_exponent():
-    assert i.eval_expression(None, {'kind': 'binop', 'op': '**', 'e1': { 'kind': 'float','value': '2.5' } , 'e2': {'kind': 'integer', 'value': '2' } }) == a._float(6.25)
-
 def test_divide():
     assert i.eval_expression(None, {'kind': 'binop', 'op': '/', 'e1': { 'kind': 'integer','value': '2' } , 'e2': {'kind': 'integer', 'value': '1' } }) == a._float(2.0)
 
@@ -210,6 +207,9 @@ def test_len_collection():
 
 def test_len_str():
     assert i.eval_expression(None, {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'len'}, 'args': [{'kind': 'string', 'value': 'foo' }]}) == a._integer(3)
+
+def test_pow():
+    assert i.eval_expression(None, {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'pow'}, 'args': [{'kind': 'float', 'value': '-3.11111'}, {'kind': 'integer', 'value': '4' }]}) == a._float(pow(-3.11111, 4))
     
 def test_bool():
     assert i.eval_expression(None, {'kind': 'call', 'fun': {'kind': 'variable', 'name': 'bool'}, 'args': [{'kind': 'integer', 'value': '1' }]}) == a._boolean(True)
