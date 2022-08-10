@@ -6,9 +6,9 @@ test_dir = os.path.dirname( __file__ )
 src_dir = os.path.join( test_dir, '..', 'src')
 sys.path.append( src_dir )
 
-from scopescript_dpaxton import interpreter as i
-from scopescript_dpaxton import atoms as a
-from scopescript_dpaxton import scope as s
+from scopescript import interpreter as i
+from scopescript import atoms as a
+from scopescript import scope as s
 #Expression tests
 
 def test_boolean():

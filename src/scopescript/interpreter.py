@@ -1,7 +1,7 @@
 import sys, collections
 
-from scopescript_dpaxton import atoms as a
-from scopescript_dpaxton import scope as s
+from scopescript import atoms as a
+from scopescript import scope as s
 
 # Depth of 12050 allows no more than 999 recursive calls. Significant overhead.    
 sys.setrecursionlimit(12050)
