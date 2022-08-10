@@ -19,7 +19,7 @@ $ pytest
 
 Or install package,
 ```console
-$ pip install -i https://test.pypi.org/simple/ scopescript-dpaxton
+$ pip install -i https://test.pypi.org/simple/ scopescript
 ```
 
 ## Syntax
@@ -67,7 +67,7 @@ Program scope is represented as a linked list of states. Each state is represent
 Closures are represented as an object with params, body, and env attributes. The params attribute stores a list of strings that represent each parameter. The body attribute stores a block of code to be executed on call. Lastly, the env attribute is a state that stores function local variables and parameters. Also, the env attribute maintains a link to it's creating state at closure creation time. Variable look up during a function call follows the closure's lexical enivronment, not the current program scope.
 
 ## Interpreter
-The interpreter is built using a network of python dictionaries containing function factories. The main two dictionaries that drive decision making are the statements and expressions dictionaries. The statements dictionary receives a statement node and creates the desired function for the statement kind. The expressions dictionary receives an expression node and creates the desired function for the expression kind. Statement nodes point to other statement nodes (self-referencing) or expression nodes. Once the program is operating using the expressions dictionary the only way to operate on the statements dictionary again would be through a function call, otherwise there is only access to the expressions dictionary from expression nodes. There also exists helper dictionaries for operator and built-in function use, both are used by the expressions dictionary. A program is represented as a list of statement nodes that the interpreter sequentially evaluates, making this a procedural langauge.
+The interpreter is built using a network of python dictionaries containing function factories. The main two dictionaries that drive decision making are the statements and expressions dictionaries. The statements dictionary receives a statement node and creates the desired function for the statement kind. The expressions dictionary receives an expression node and creates the desired function for the expression kind. Statement nodes point to other statement nodes (self-referencing) or expression nodes. Once the program is operating using the expressions dictionary the only way to operate on the statements dictionary again would be through a function call, otherwise there is only access to the expressions dictionary from expression nodes. There also exists helper dictionaries for operator and built-in function use, both are used by the expressions dictionary. A program is represented as a list of statement nodes that the interpreter sequentially evaluates.
 
 ## Additional language information
 https://github.com/danpaxton/scopescript-parser

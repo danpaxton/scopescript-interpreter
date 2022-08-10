@@ -3,12 +3,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "scopescript_dpaxton"
-version = "0.1.4"
+name = "scopescript"
+version = "1.0.0"
 authors = [
   { name="Dan Paxton", email="danpaxton47@gmail.com" },
 ]
-description = "An interpreter for the Scope Script Language."
+description = "An interpreter for the ScopeScript Language."
 readme = "README.md"
 license = { file="LICENSE" }
 requires-python = ">=3.7"
@@ -19,4 +19,4 @@ classifiers = [
 ]
 
 [project.urls]
-"Repository" = "https://github.com/danpaxton/scope-script-interpreter"
+"Repository" = "https://github.com/danpaxton/scopescript-interpreter"
