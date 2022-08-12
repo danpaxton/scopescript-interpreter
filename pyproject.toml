@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scopescript"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
   { name="Dan Paxton", email="danpaxton47@gmail.com" },
 ]

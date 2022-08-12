@@ -367,5 +367,6 @@ def test_delete():
     i.eval_statement(state, {'kind': 'delete', 'expr': {'kind': 'attribute', 'collection': {'kind': 'variable', 'name': 'x'}, 'attribute': 'y'}})
     assert 'y' not in state.value['x'].value
     
+    
 def test_return():
     assert i.eval_statement(None, {'kind': 'return', 'expr': {'kind': 'integer', 'value': '1'}}, i.Flags(True, False)) == ('return', a._integer(1))

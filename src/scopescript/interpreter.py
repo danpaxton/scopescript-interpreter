@@ -536,12 +536,12 @@ def _call_(state: s.State, e: dict) -> tuple:
     if len(args) != len(func.params):
         error(state, f"Line {e['line']}: invalid argument count for {name}(...): Expected {len(func.params)}.")
     # Assign parameters to arguments in the function environment.
-    env = func.env.value
+    env = func.new_env()
     for param, arg in zip(func.params, args):
         env[param] = eval_expression(state, arg)
     # Evaluate function block in it's own environment.
     try:
-        result = eval_block(func.env, func.body, Flags(True, False)) 
+        result = eval_block(func.get_env(), func.body, Flags(True, False)) 
     except RecursionError:
         error(state, f"Line {e['line']}: maximum recursion depth exceeded for {name}(...).")
     # Return null if there is no return value

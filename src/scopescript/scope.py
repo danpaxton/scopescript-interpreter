@@ -1,13 +1,26 @@
-from collections import namedtuple
+from collections import namedtuple, deque
+
 # Stores current state and a link to parent state.
 State = namedtuple('State', ['value', 'parent', 'output'])
 
-# Stores function code, parameters, and maintains a link to it's lexical environment.
+# Stores function code, parameters, and a link to it's lexical environment.
 class Closure:
+    # Maintains most recent call environment.
+    env = deque()
     def __init__(self, params, body, parent) -> None:
         self.params = params
         self.body = body 
-        self.env = State({}, parent, parent.output)
+        self.parent = parent
+    # Push new enviroment state and return it's value.
+    def new_env(self) -> dict:
+        val = {}
+        self.env.append(State(val, self.parent, self.parent.output))
+        return val
+    # Pop most recently made environment.
+    def get_env(self) -> State:
+        return self.env.pop()
+    
+
         
 # Starts in the current state, follows parent references until variable is found.
 def find_in_scope(state: State, name: str) -> tuple | None:
