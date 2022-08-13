@@ -50,7 +50,7 @@ def _variable_(state: s.State, e: dict) -> tuple:
     name = e['name']
     result = s.find_in_scope(state, name)
     if not result:
-        error(state, f"Line {e.line}: Variable '{name}' is not defined.")
+        error(state, f"Line {e['line']}: Variable '{name}' is not defined.")
 
     return result[1]
 
@@ -113,9 +113,8 @@ def _handle_subscriptor_(state: s.State, e: dict) -> tuple:
 
 # Assigns collection attribute or variable the argument value.
 def assign_val(state: s.State, e: dict, val: tuple) -> tuple | None:
-    match e['kind']:
-        case 'identifier' | 'variable':
-            return s.set_variable(state, e, val)
+    if a.assignable(e['kind']):
+        return s.set_variable(state, e, val)
     
     # Attribute assignment.
     attribute = determine_attribute(state, e)
@@ -593,7 +592,8 @@ def _static_(state: s.State, s: dict, flags: tuple) -> None:
 def _assignment_(state: s.State, s: dict, flags: tuple) -> None:
     val = eval_expression(state, s['expr'])
     for e in s['assignArr']:
-        assign_val(state, e, val)
+        if not assign_val(state, e, val):
+           error(state, f"Line {e['line']}: unknown assignment type: <{e['kind']}>.") 
 
     return None
 
@@ -720,5 +720,3 @@ def interp_program(p):
         return dict(kind='ok', output=out)
     except AssertionError:
         return dict(kind='error', output=out)
-    except:
-        return dict(kind='error', output=[])
