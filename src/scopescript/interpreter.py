@@ -720,3 +720,5 @@ def interp_program(p):
         return dict(kind='ok', output=out)
     except AssertionError:
         return dict(kind='error', output=out)
+    except:
+        return dict(kind='error', output=[])
