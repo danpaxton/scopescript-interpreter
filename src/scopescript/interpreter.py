@@ -113,8 +113,9 @@ def _handle_subscriptor_(state: s.State, e: dict) -> tuple:
 
 # Assigns collection attribute or variable the argument value.
 def assign_val(state: s.State, e: dict, val: tuple) -> tuple | None:
-    if a.assignable(e['kind']):
-        return s.set_variable(state, e, val)
+    match e['kind']:
+        case 'identifier' | 'variable':
+            return s.set_variable(state, e, val)
     
     # Attribute assignment.
     attribute = determine_attribute(state, e)
