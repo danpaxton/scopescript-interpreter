@@ -1,5 +1,5 @@
 # ScopeScript Interpreter
-View on pypi: https://test.pypi.org/project/scopescript-dpaxton<br>
+View on pypi: https://pypi.org/project/scopescript-dpaxton<br>
 View parser: https://github.com/danpaxton/scopescript-parser<br>
 View language IDE: https://github.com/danpaxton/scopescript-ide<br>
 
