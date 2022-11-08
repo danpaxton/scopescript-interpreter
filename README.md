@@ -1,3 +1,6 @@
+# DEPRECATED
+See https://github.com/danpaxton/scopescript
+
 # ScopeScript Interpreter
 View on pypi: https://pypi.org/project/scopescript/<br>
 View parser: https://github.com/danpaxton/scopescript-parser<br>
